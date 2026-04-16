@@ -659,9 +659,7 @@ void VideoDecoderPipeline::InitializeTask(const VideoDecoderConfig& config,
     return;
   }
 
-  // HACK: Workaround for CHECK(main_frame_pool_) failure during reinit.
-  // if (frame_converter_->UsesGetOriginalFrameCB()) {
-  if (main_frame_pool_ && frame_converter_->UsesGetOriginalFrameCB()) {
+  if (frame_converter_->UsesGetOriginalFrameCB()) {
     FrameResourceConverter::GetOriginalFrameCB get_original_frame_cb;
 
     if (uses_oop_video_decoder_) {

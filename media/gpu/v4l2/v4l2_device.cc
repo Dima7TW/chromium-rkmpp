@@ -39,21 +39,6 @@
 #include "media/gpu/v4l2/v4l2_queue.h"
 #include "media/gpu/v4l2/v4l2_utils.h"
 
-// Auto-generated for dlopen libv4l2 libraries
-#include "media/gpu/v4l2/v4l2_stubs.h"
-#include "third_party/v4l-utils/lib/include/libv4l2.h"
-
-using media_gpu_v4l2::InitializeStubs;
-using media_gpu_v4l2::kModuleV4l2;
-using media_gpu_v4l2::StubPathMap;
-
-inline static constexpr char kLibV4l2Path[] =
-#if defined(__aarch64__)
-      "/usr/lib64/libv4l2.so";
-#else
-      "/usr/lib/libv4l2.so";
-#endif
-
 namespace media {
 
 namespace {
@@ -99,7 +84,6 @@ class V4L2QueueFactory {
 
 V4L2Device::V4L2Device() {
   DETACH_FROM_SEQUENCE(client_sequence_checker_);
-  use_libv4l2_ = false;
 }
 
 V4L2Device::~V4L2Device() {
@@ -343,10 +327,6 @@ gfx::Size V4L2Device::AllocatedSizeFromV4L2Format(
 
 int V4L2Device::Ioctl(int request, void* arg) {
   DCHECK(device_fd_.is_valid());
-
-  if (use_libv4l2_)
-    return HANDLE_EINTR(v4l2_ioctl(device_fd_.get(), request, arg));
-
   return HANDLE_EINTR(ioctl(device_fd_.get(), request, arg));
 }
 
@@ -371,11 +351,7 @@ bool V4L2Device::Poll(bool poll_device, bool* event_pending) {
     VPLOGF(1) << "poll() failed";
     return false;
   }
-
-  // HACK: Could not fake POLLPRI with eventfd
-  // *event_pending = (pollfd != -1 && pollfds[pollfd].revents & POLLPRI);
-  *event_pending = (pollfd != -1 && pollfds[pollfd].revents & POLLIN);
-
+  *event_pending = (pollfd != -1 && pollfds[pollfd].revents & POLLPRI);
   return true;
 }
 
@@ -385,16 +361,10 @@ void* V4L2Device::Mmap(void* addr,
                        int flags,
                        unsigned int offset) {
   DCHECK(device_fd_.is_valid());
-  if (use_libv4l2_)
-    return v4l2_mmap(addr, len, prot, flags, device_fd_.get(), offset);
   return mmap(addr, len, prot, flags, device_fd_.get(), offset);
 }
 
 void V4L2Device::Munmap(void* addr, unsigned int len) {
-  if (use_libv4l2_) {
-    v4l2_munmap(addr, len);
-    return;
-  }
   munmap(addr, len);
 }
 
@@ -405,8 +375,7 @@ bool V4L2Device::SetDevicePollInterrupt() {
   if (HANDLE_EINTR(write(device_poll_interrupt_fd_.get(), &buf, sizeof(buf))) ==
       -1) {
     VPLOGF(1) << "write() failed";
-    // HACK: Fake success for eventfd
-    // return false;
+    return false;
   }
   return true;
 }
@@ -422,8 +391,7 @@ bool V4L2Device::ClearDevicePollInterrupt() {
       return true;
     } else {
       VPLOGF(1) << "read() failed";
-      // HACK: Fake success for eventfd
-      // return false;
+      return false;
     }
   }
   return true;
@@ -884,35 +852,16 @@ bool V4L2Device::OpenDevicePath(const std::string& path) {
 
   device_fd_.reset(
       HANDLE_EINTR(open(path.c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC)));
-  if (!device_fd_.is_valid())
-    return false;
-
-  StubPathMap paths;
-  paths[kModuleV4l2].push_back(kLibV4l2Path);
-
-  static bool libv4l2_initialized = InitializeStubs(paths);
-  if (!libv4l2_initialized) {
-    VLOGF(1) << "Failed to initialize LIBV4L2 libs";
-  } else {
-    if (HANDLE_EINTR(v4l2_fd_open(device_fd_.get(), V4L2_DISABLE_CONVERSION)) !=
-            -1) {
-      DVLOGF(3) << "Using libv4l2 for " << path;
-      use_libv4l2_ = true;
-    }
-  }
-  return true;
+  return device_fd_.is_valid();
 }
 
 void V4L2Device::CloseDevice() {
   DVLOGF(3);
-  if (use_libv4l2_ && device_fd_.is_valid())
-    v4l2_close(device_fd_.release());
   device_fd_.reset();
 }
 
 void V4L2Device::EnumerateDevicesForType(Type type) {
-// HACK: We are using chromeos style devices.
-#if 1 //BUILDFLAG(IS_CHROMEOS)
+#if BUILDFLAG(IS_CHROMEOS)
   static const std::string kDecoderDevicePattern = "/dev/video-dec";
   static const std::string kEncoderDevicePattern = "/dev/video-enc";
   static const std::string kImageProcessorDevicePattern = "/dev/image-proc";
