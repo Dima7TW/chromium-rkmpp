@@ -30,4 +30,5 @@
 -ui/gl/  # Unsafe generated files.
 -url/third_party/
 -v8/
+-media/gpu/v4l2/mt21/
 
