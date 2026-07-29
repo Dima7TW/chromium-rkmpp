@@ -70,11 +70,13 @@ constexpr size_t kInputBufferMaxSizeFor4k = 2 * kInputBufferMaxSizeFor1080p;
 
 // Input format V4L2 fourccs this class supports.
 const std::vector<uint32_t> kSupportedInputFourccs = {
+#if BUILDFLAG(IS_CHROMEOS)
     // V4L2 stateless formats
     V4L2_PIX_FMT_H264_SLICE,
 #if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
     V4L2_PIX_FMT_HEVC_SLICE,
 #endif  // BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
+#endif
     V4L2_PIX_FMT_VP8_FRAME,
     V4L2_PIX_FMT_VP9_FRAME,
     V4L2_PIX_FMT_AV1_FRAME,
@@ -463,6 +465,7 @@ V4L2Status V4L2VideoDecoder::InitializeBackend() {
              << " and fourcc: " << FourccToString(input_format_fourcc_);
     backend_ = std::make_unique<V4L2StatefulVideoDecoderBackend>(
         this, device_, profile_, color_space_, decoder_task_runner_);
+#if BUILDFLAG(IS_CHROMEOS)
   } else {
     DCHECK_EQ(preferred_api_and_format.first, kStateless);
     VLOGF(1) << "Using a stateless API for profile: "
@@ -471,6 +474,7 @@ V4L2Status V4L2VideoDecoder::InitializeBackend() {
     backend_ = std::make_unique<V4L2StatelessVideoDecoderBackend>(
         this, device_, profile_, color_space_, decoder_task_runner_,
         cdm_context_ref_ ? cdm_context_ref_->GetCdmContext() : nullptr);
+#endif
   }
 
   if (!backend_->Initialize()) {
@@ -637,12 +641,14 @@ CroStatus V4L2VideoDecoder::SetupOutputFormat(const gfx::Size& size,
   DVLOGF(3) << "size: " << size.ToString()
             << ", visible_rect: " << visible_rect.ToString();
 
+#if BUILDFLAG(IS_CHROMEOS)
   if (!backend_is_stateful_) {
     CroStatus ext_status = SetExtCtrlsInit(size, bit_depth);
     if (ext_status != CroStatus::Codes::kOk) {
       return ext_status;
     }
   }
+#endif
 
   const auto v4l2_pix_fmts = EnumerateSupportedPixFmts(
       base::BindRepeating(&V4L2Device::Ioctl, device_),
@@ -758,6 +764,7 @@ CroStatus V4L2VideoDecoder::SetupOutputFormat(const gfx::Size& size,
 
 CroStatus V4L2VideoDecoder::SetExtCtrlsInit(const gfx::Size& size,
                                             const uint8_t bit_depth) {
+#if BUILDFLAG(IS_CHROMEOS)
   std::vector<struct v4l2_ext_control> ctrls;
   struct v4l2_ctrl_h264_sps v4l2_h264_sps;
   struct v4l2_ctrl_hevc_sps v4l2_hevc_sps;
@@ -858,6 +865,9 @@ CroStatus V4L2VideoDecoder::SetExtCtrlsInit(const gfx::Size& size,
   }
 
   return CroStatus::Codes::kOk;
+#else
+  return CroStatus::Codes::kNoDecoderOutputFormatCandidates;
+#endif
 }
 
 void V4L2VideoDecoder::Reset(base::OnceClosure closure) {
