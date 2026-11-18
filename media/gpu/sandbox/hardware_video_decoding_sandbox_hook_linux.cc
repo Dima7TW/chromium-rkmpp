@@ -147,7 +147,7 @@ bool HardwareVideoDecodingPreSandboxHookForVaapiOnAMD(
   radeonsi_lib = DRI_DRIVER_DIR "/radeonsi_dri.so";
 #endif
   if (nullptr == dlopen(radeonsi_lib, kDlopenFlags)) {
-    LOG(ERROR) << "dlopen(radeonsi_dri.so) failed with error: " << dlerror();
+    // LOG(ERROR) << "dlopen(radeonsi_dri.so) failed with error: " << dlerror();
     return false;
   }
 

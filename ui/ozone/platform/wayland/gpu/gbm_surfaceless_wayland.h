@@ -153,6 +153,7 @@ class GbmSurfacelessWayland : public gl::Presenter, public WaylandSurfaceGpu {
 
   void MaybeSubmitFrames();
 
+  EGLSyncKHR InsertFence(bool implicit);
   void FenceRetired(uint32_t frame_id);
 
   // Sets a flag that skips glFlush step in unittests.

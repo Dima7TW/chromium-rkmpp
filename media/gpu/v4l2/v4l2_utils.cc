@@ -50,8 +50,53 @@
 #define DRM_FORMAT_MOD_MTK_16L_32S_TILE 0x0b00000000000001
 #endif
 
+#ifndef V4L2_CID_MPEG_VIDEO_AV1_PROFILE
+#ifdef V4L2_CID_CODEC_BASE
+#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE (V4L2_CID_CODEC_BASE + 655)
+#else
+#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE (V4L2_CID_MPEG_BASE + 655)
+#endif
+enum v4l2_mpeg_video_av1_profile {
+  V4L2_MPEG_VIDEO_AV1_PROFILE_MAIN = 0,
+  V4L2_MPEG_VIDEO_AV1_PROFILE_HIGH = 1,
+  V4L2_MPEG_VIDEO_AV1_PROFILE_PROFESSIONAL = 2,
+};
+#endif
+
+#ifndef V4L2_CID_MPEG_VIDEO_AV1_PROFILE
+#ifdef V4L2_CID_CODEC_BASE
+#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE (V4L2_CID_CODEC_BASE + 655)
+#else
+#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE (V4L2_CID_MPEG_BASE + 655)
+#endif
+enum v4l2_mpeg_video_av1_profile {
+  V4L2_MPEG_VIDEO_AV1_PROFILE_MAIN = 0,
+  V4L2_MPEG_VIDEO_AV1_PROFILE_HIGH = 1,
+  V4L2_MPEG_VIDEO_AV1_PROFILE_PROFESSIONAL = 2,
+};
+#endif
+
+// Auto-generated for dlopen libv4l2 libraries
+#include "media/gpu/v4l2/v4l2_stubs.h"
+#include "third_party/v4l-utils/lib/include/libv4l2.h"
+
+using media_gpu_v4l2::InitializeStubs;
+using media_gpu_v4l2::kModuleV4l2;
+using media_gpu_v4l2::StubPathMap;
+
+inline static constexpr char kLibV4l2Path[] =
+#if defined(__aarch64__)
+      "/usr/lib64/libv4l2.so";
+#else
+      "/usr/lib/libv4l2.so";
+#endif
+
+static bool use_libv4l2_ = false;
+
 namespace {
 int HandledIoctl(int fd, int request, void* arg) {
+  if (use_libv4l2_)
+    return HANDLE_EINTR(v4l2_ioctl(fd, request, arg));
   return HANDLE_EINTR(ioctl(fd, request, arg));
 }
 
@@ -167,6 +212,11 @@ VideoCodecProfile V4L2ProfileToVideoCodecProfile(uint32_t v4l2_codec,
           return H264PROFILE_EXTENDED;
         case V4L2_MPEG_VIDEO_H264_PROFILE_HIGH:
           return H264PROFILE_HIGH;
+        // H264 High 10 is left out on purpose: the Rockchip decoders do
+        // not support 10-bit H264, and advertising it would make Chrome
+        // pick the decoder for High10 streams that then fail to decode.
+        case V4L2_MPEG_VIDEO_H264_PROFILE_HIGH_422:
+          return H264PROFILE_HIGH422PROFILE;
       }
       break;
     case V4L2_CID_MPEG_VIDEO_VP8_PROFILE:
@@ -210,8 +260,8 @@ VideoCodecProfile V4L2ProfileToVideoCodecProfile(uint32_t v4l2_codec,
           return AV1PROFILE_PROFILE_PRO;
       }
       break;
-#endif
   }
+#endif
   return VIDEO_CODEC_PROFILE_UNKNOWN;
 }
 
@@ -374,6 +424,8 @@ static const std::map<VideoCodecProfile,
         {H264PROFILE_BASELINE, MAKE_V4L2_CODEC_PAIR(V4L2_PIX_FMT_H264, SLICE)},
         {H264PROFILE_MAIN, MAKE_V4L2_CODEC_PAIR(V4L2_PIX_FMT_H264, SLICE)},
         {H264PROFILE_HIGH, MAKE_V4L2_CODEC_PAIR(V4L2_PIX_FMT_H264, SLICE)},
+        {H264PROFILE_HIGH422PROFILE,
+         MAKE_V4L2_CODEC_PAIR(V4L2_PIX_FMT_H264, SLICE)},
 #if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
         {HEVCPROFILE_MAIN, MAKE_V4L2_CODEC_PAIR(V4L2_PIX_FMT_HEVC, SLICE)},
         {HEVCPROFILE_MAIN10, MAKE_V4L2_CODEC_PAIR(V4L2_PIX_FMT_HEVC, SLICE)},
@@ -548,6 +600,20 @@ uint32_t VideoCodecProfileToV4L2PixFmt(VideoCodecProfile profile,
   CHECK(kVideoCodecProfileToV4L2CodecPixFmt.contains(profile))
       << "Unsupported profile: " << GetProfileName(profile);
 
+#if !BUILDFLAG(IS_CHROMEOS)
+  if (slice_based) {
+    LOG(ERROR) << "Slice is not supported";
+    return 0;
+  }
+#endif
+
+#if !BUILDFLAG(IS_CHROMEOS)
+  if (slice_based) {
+    LOG(ERROR) << "Slice is not supported";
+    return 0;
+  }
+#endif
+
   const auto& v4l2_pix_fmt = kVideoCodecProfileToV4L2CodecPixFmt.at(profile);
   return slice_based ? v4l2_pix_fmt.first : v4l2_pix_fmt.second;
 }
@@ -579,7 +645,8 @@ std::optional<SupportedVideoDecoderConfigs> GetSupportedV4L2DecoderConfigs() {
   SupportedVideoDecoderConfigs supported_media_configs;
   std::vector<std::string> candidate_paths;
 
-#if BUILDFLAG(IS_CHROMEOS)
+// HACK: We are using chromeos style devices.
+#if 1 //BUILDFLAG(IS_CHROMEOS)
   constexpr char kVideoDevicePattern[] = "/dev/video-dec0";
   candidate_paths.push_back(kVideoDevicePattern);
 #else
@@ -592,6 +659,13 @@ std::optional<SupportedVideoDecoderConfigs> GetSupportedV4L2DecoderConfigs() {
   }
 #endif
 
+  StubPathMap paths;
+  paths[kModuleV4l2].push_back(kLibV4l2Path);
+
+  static bool libv4l2_initialized = InitializeStubs(paths);
+  if (!libv4l2_initialized)
+    VLOGF(1) << "Failed to initialize LIBV4L2 libs";
+
   for (const auto& path : candidate_paths) {
     base::ScopedFD device_fd(
         HANDLE_EINTR(open(path.c_str(), O_RDWR | O_NONBLOCK | O_CLOEXEC)));
@@ -600,6 +674,15 @@ std::optional<SupportedVideoDecoderConfigs> GetSupportedV4L2DecoderConfigs() {
       PLOG(WARNING) << "Could not open " << path;
 #endif
       continue;
+    }
+
+    use_libv4l2_ = false;
+    if (libv4l2_initialized) {
+      if (HANDLE_EINTR(v4l2_fd_open(device_fd.get(), V4L2_DISABLE_CONVERSION)) !=
+          -1) {
+        DVLOGF(3) << "Using libv4l2 for " << path;
+        use_libv4l2_ = true;
+      }
     }
 
     std::vector<uint32_t> v4l2_codecs = EnumerateSupportedPixFmts(
@@ -628,6 +711,10 @@ std::optional<SupportedVideoDecoderConfigs> GetSupportedV4L2DecoderConfigs() {
             /*require_encrypted=*/false));
       }
     }
+
+    if (use_libv4l2_ && device_fd.is_valid())
+      v4l2_close(device_fd.release());
+    device_fd.reset();
   }
 
 #if DCHECK_IS_ON()
@@ -642,6 +729,7 @@ std::optional<SupportedVideoDecoderConfigs> GetSupportedV4L2DecoderConfigs() {
 }
 
 bool IsV4L2DecoderStateful() {
+#if 0
   auto device_fd = V4L2Device::OpenFDForType(V4L2Device::Type::kDecoder);
   if (!device_fd.is_valid()) {
     return false;
@@ -662,6 +750,10 @@ bool IsV4L2DecoderStateful() {
                             kSupportedStatefulInputCodecs.begin(),
                             kSupportedStatefulInputCodecs.end()) !=
          v4l2_codecs.end();
+#else
+  /* HACK: Force disabling stateful decoder. */
+  return false;
+#endif
 }
 
 bool IsVislDriver() {

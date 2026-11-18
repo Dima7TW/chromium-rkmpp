@@ -2,9 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/buildflag_header.gni")
 import("//third_party/webrtc/webrtc.gni")
 
 assert(is_linux || is_chromeos)
+
+buildflag_header("buildflags") {
+  header = "buildflags.h"
+
+  flags = [
+    "USE_LIBV4L2=$use_v4lplugin",
+  ]
+}
 
 source_set("linux") {
   visibility = [
@@ -70,6 +79,12 @@ source_set("linux") {
     "//ui/display",
     "//ui/gfx",
   ]
+
+  public_deps += [ ":buildflags" ]
+
+  if (use_v4lplugin) {
+    deps += [ "//media/gpu/v4l2:libv4l2_stubs" ]
+  }
 }
 
 source_set("test_support") {

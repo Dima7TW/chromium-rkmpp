@@ -1,0 +1,10 @@
+--- media/gpu/v4l2/legacy/v4l2_video_decoder_backend_stateful.cc
++++ media/gpu/v4l2/legacy/v4l2_video_decoder_backend_stateful.cc
+@@ -756,6 +756,7 @@ bool V4L2StatefulVideoDecoderBackend::IsSupportedProfile(
+ #if BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
+       V4L2_PIX_FMT_HEVC,
+ #endif  // BUILDFLAG(ENABLE_HEVC_PARSER_AND_HW_DECODER)
++      V4L2_PIX_FMT_AV1,
+       V4L2_PIX_FMT_VP8,
+       V4L2_PIX_FMT_VP9,
+     };
