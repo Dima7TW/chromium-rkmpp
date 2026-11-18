@@ -762,9 +762,6 @@ CroStatus V4L2VideoDecoder::SetupOutputFormat(const gfx::Size& size,
   }
 
   return CroStatus::Codes::kOk;
-#else
-  return CroStatus::Codes::kNoDecoderOutputFormatCandidates;
-#endif
 }
 
 CroStatus V4L2VideoDecoder::SetExtCtrlsInit(const gfx::Size& size,
