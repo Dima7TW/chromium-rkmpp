@@ -755,6 +755,7 @@ bool V4L2StatefulVideoDecoderBackend::IsSupportedProfile(
         V4L2_PIX_FMT_H264,
         V4L2_PIX_FMT_VP8,
         V4L2_PIX_FMT_VP9,
+        V4L2_PIX_FMT_AV1,
     };
     auto device = base::MakeRefCounted<V4L2Device>();
     VideoDecodeAccelerator::SupportedProfiles profiles =
