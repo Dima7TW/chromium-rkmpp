@@ -63,19 +63,6 @@ enum v4l2_mpeg_video_av1_profile {
 };
 #endif
 
-#ifndef V4L2_CID_MPEG_VIDEO_AV1_PROFILE
-#ifdef V4L2_CID_CODEC_BASE
-#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE (V4L2_CID_CODEC_BASE + 655)
-#else
-#define V4L2_CID_MPEG_VIDEO_AV1_PROFILE (V4L2_CID_MPEG_BASE + 655)
-#endif
-enum v4l2_mpeg_video_av1_profile {
-  V4L2_MPEG_VIDEO_AV1_PROFILE_MAIN = 0,
-  V4L2_MPEG_VIDEO_AV1_PROFILE_HIGH = 1,
-  V4L2_MPEG_VIDEO_AV1_PROFILE_PROFESSIONAL = 2,
-};
-#endif
-
 // Auto-generated for dlopen libv4l2 libraries
 #include "media/gpu/v4l2/v4l2_stubs.h"
 #include "third_party/v4l-utils/lib/include/libv4l2.h"
